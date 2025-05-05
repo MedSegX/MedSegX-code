@@ -1,0 +1,11 @@
+matplotlib==3.7.2
+monai==1.2.0
+numpy==1.25.2
+opencv-python==4.9.0.80
+pandas==2.1.4
+Pillow==9.4.0
+scikit-image==0.21.0
+scipy==1.11.2
+torch==2.0.0
+torchvision==0.15.0
+tqdm==4.66.1
