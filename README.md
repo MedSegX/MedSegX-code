@@ -31,5 +31,5 @@ For additional information about the datasets or their licenses, please reach ou
 
 ## Acknowledgement
 
-We appreciate the open-source efforts of [SAM](https://github.com/facebookresearch/segment-anything) and [MedSAM](https://github.com/bowang-lab/MedSAM) teams.
+We appreciate the open-source efforts of [SAM](https://github.com/facebookresearch/segment-anything) team.
 
