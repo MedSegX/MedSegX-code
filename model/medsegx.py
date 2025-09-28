@@ -1,7 +1,8 @@
-import math
 import os
 join = os.path.join
-from typing import Type, List
+
+import math
+from typing import Type
 
 import torch
 import torch.nn as nn
@@ -13,8 +14,11 @@ from data.datainfo import *
 
 def get_index(map_idx):
     idx = map_idx
-    for i in range(max(map_idx.keys())+1):
-        idx[i] = map_idx.get(i, -1) + 1
+    for i in range(list(map_idx.items())[-1][0]):
+        if i not in idx:
+            idx[i] = 0
+    # for i in range(max(map_idx.keys())+1):
+    #     idx[i] = map_idx.get(i, -1) + 1
     idx = dict(sorted(idx.items(), key=lambda x: x[0]))
     return torch.LongTensor(list(idx.values()))
 
@@ -37,6 +41,7 @@ class MoEAdaptMLPBlock(nn.Module):
         dim = mlp.embedding_dim
         self.adapter_input_embed = nn.Linear(dim, embedding_dim)
         self.adapter_gate = nn.Linear(embedding_dim * embedding_num, expert_num)
+        self.adapter_organ_gate = nn.Linear(embedding_dim * 4, 4)
         
         self.adapter_down = nn.ModuleList([
             nn.Linear(dim, adapter_bn) for _ in range(expert_num)
@@ -69,18 +74,25 @@ class MoEAdaptMLPBlock(nn.Module):
                 p=self.adapter_dropout, training=self.training)))
         adpt = torch.stack(adpt, dim=1)
         
+        organ_0, organ_1, organ_2, organ_3, task = organ
+        organ = torch.cat([organ_0, organ_1, organ_2, organ_3], dim=-1)
+        organ_gate = self.adapter_organ_gate(organ)
+        organ_gate = torch.softmax(organ_gate, dim=-1)
+        organ = torch.stack([organ_0, organ_1, organ_2, organ_3], dim=1)
+        organ = torch.einsum('bec,be->bc', organ, organ_gate)
+        
         input = x.mean(dim=1).mean(dim=1)
         input = self.adapter_input_embed(input)
-        organ_0, organ_1, organ_2, organ_3, task = organ
-        gate = torch.cat([organ_0, organ_1, organ_2, organ_3, task, modal, input], dim=-1)
+        
+        gate = torch.cat([organ, task, modal, input], dim=-1)
         gate = self.adapter_gate(gate)
         gate = torch.softmax(gate, dim=1)
         
-        adpt = torch.einsum('bemnc,be->bemnc', adpt, gate).sum(dim=1)
+        adpt = torch.einsum('bemnc,be->bmnc', adpt, gate)
         return self.mlp(x) + adpt * self.adapter_scale, gate
 
 class MedSegX(nn.Module):
-    """Applies Tree MoE Adapter to a SAM's image encoder.
+    """Applies Tree MoE Adapter to SAM's image encoder.
 
     Args:
         sam: segment anything model, see 'segment_anything' dir
@@ -123,17 +135,17 @@ class MedSegX(nn.Module):
         organ_index_2 = get_index(organ_level_2_map_idx)
         organ_index_3 = get_index(organ_level_3_map_idx)
         
-        sam.image_encoder.register_buffer('modal_index', modal_index)
-        sam.image_encoder.register_buffer('organ_index_1', organ_index_1)
-        sam.image_encoder.register_buffer('organ_index_2', organ_index_2)
-        sam.image_encoder.register_buffer('organ_index_3', organ_index_3)
+        sam.image_encoder.register_buffer('modal_index', modal_index, False)
+        sam.image_encoder.register_buffer('organ_index_1', organ_index_1, False)
+        sam.image_encoder.register_buffer('organ_index_2', organ_index_2, False)
+        sam.image_encoder.register_buffer('organ_index_3', organ_index_3, False)
         
-        modal_embed = nn.Embedding(modal_index.max()+1, embedding_dim)
+        modal_embed = nn.Embedding(len(modal_map_idx), embedding_dim)
         organ_embed_0 = nn.Embedding(1, embedding_dim)
-        organ_embed_1 = nn.Embedding(organ_index_1.max()+1, embedding_dim)
-        organ_embed_2 = nn.Embedding(organ_index_2.max()+1, embedding_dim)
-        organ_embed_3 = nn.Embedding(organ_index_3.max()+1, embedding_dim)
-        organ_embed_4 = nn.Embedding(len(task_list), embedding_dim)
+        organ_embed_1 = nn.Embedding(len(organ_level_1_map_idx), embedding_dim)
+        organ_embed_2 = nn.Embedding(len(organ_level_2_map_idx), embedding_dim)
+        organ_embed_3 = nn.Embedding(len(organ_level_3_map_idx), embedding_dim)
+        organ_embed_4 = nn.Embedding(len(task_list)+1, embedding_dim)
         nn.init.zeros_(modal_embed.weight)
         nn.init.zeros_(organ_embed_0.weight)
         nn.init.zeros_(organ_embed_1.weight)
@@ -153,11 +165,11 @@ class MedSegX(nn.Module):
             if idx not in self.pos:
                 continue
             
-            # create adapter layers
+            # create moe adapter layers
             blk.mlp = MoEAdaptMLPBlock(
                 blk.mlp,
                 expert_num=expert_num,
-                embedding_num=7,
+                embedding_num=4,
                 embedding_dim=embedding_dim,
                 adapter_bn=bottleneck_dim,
             )
@@ -171,12 +183,6 @@ class MedSegX(nn.Module):
             state_dict = self.sam.module.state_dict()
         else:
             state_dict = self.sam.state_dict()
-        
-        # save adapter parameters
-        adapter_tensors = {}
-        for key, value in state_dict.items():
-            if 'adapter' in key:
-                adapter_tensors[key] = value
         
         # save image encoder parameters
         image_encoder_tensors = {}
@@ -195,6 +201,12 @@ class MedSegX(nn.Module):
         for key, value in state_dict.items():
             if 'mask_decoder' in key:
                 mask_decoder_tensors[key] = value
+        
+        # save adapter parameters
+        adapter_tensors = {}
+        for key, value in state_dict.items():
+            if 'adapter' in key:
+                adapter_tensors[key] = value
 
         merged_dict = {**adapter_tensors, **image_encoder_tensors, **prompt_encoder_tensors, **mask_decoder_tensors}
         return merged_dict
@@ -204,12 +216,6 @@ class MedSegX(nn.Module):
         """
         sam_dict = self.sam.state_dict()
         sam_keys = sam_dict.keys()
-
-        # load adapter parameters
-        adapter_keys = [k for k in sam_keys if 'adapter' in k]
-        adapter_values = [state_dict[k] for k in adapter_keys]
-        adapter_new_state_dict = {k: v for k, v in zip(adapter_keys, adapter_values)}
-        sam_dict.update(adapter_new_state_dict)
         
         # load image encoder parameters
         image_encoder_keys = [k for k in sam_keys if 'modal_embed' in k or 'organ_embed' in k]
@@ -228,6 +234,12 @@ class MedSegX(nn.Module):
         mask_decoder_values = [state_dict[k] for k in mask_decoder_keys]
         mask_decoder_new_state_dict = {k: v for k, v in zip(mask_decoder_keys, mask_decoder_values)}
         sam_dict.update(mask_decoder_new_state_dict)
+
+        # load adapter parameters
+        adapter_keys = [k for k in sam_keys if 'adapter' in k]
+        adapter_values = [state_dict[k] for k in adapter_keys]
+        adapter_new_state_dict = {k: v for k, v in zip(adapter_keys, adapter_values)}
+        sam_dict.update(adapter_new_state_dict)
         
         self.sam.load_state_dict(sam_dict)
 
@@ -240,22 +252,18 @@ class MedSegX(nn.Module):
         
         modal_index = self.sam.image_encoder.modal_index[modal]
         modal_embed = self.sam.image_encoder.modal_embed(modal_index)
-        # modal_embed = None
         
         organ_1, organ_2, organ_3, organ_4 = organ
         organ_index_0 = torch.zeros(B, dtype=torch.long, device=img.device)
         organ_embed_0 = self.sam.image_encoder.organ_embed[0](organ_index_0)
-        
         organ_index_1 = self.sam.image_encoder.organ_index_1[organ_1]
         organ_embed_1 = self.sam.image_encoder.organ_embed[1](organ_index_1)
-        
         organ_index_2 = self.sam.image_encoder.organ_index_2[organ_2]
         organ_embed_2 = self.sam.image_encoder.organ_embed[2](organ_index_2)
-        
         organ_index_3 = self.sam.image_encoder.organ_index_3[organ_3]
         organ_embed_3 = self.sam.image_encoder.organ_embed[3](organ_index_3)
         
-        organ_embed_4 = self.sam.image_encoder.organ_embed[4](organ_4.to(img.device))
+        organ_embed_4 = self.sam.image_encoder.organ_embed[4](organ_4)
         organ_embed = (organ_embed_0, organ_embed_1, organ_embed_2, organ_embed_3, organ_embed_4)
         
         # prompt encoder
@@ -281,6 +289,4 @@ class MedSegX(nn.Module):
             multimask_output=True,
           )
         
-        expert_activation = torch.stack(expert_activation, dim=1)
-        
-        return mask_predictions#, expert_activation
+        return mask_predictions

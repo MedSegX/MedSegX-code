@@ -6,6 +6,4 @@ pandas==2.1.4
 Pillow==9.4.0
 scikit-image==0.21.0
 scipy==1.11.2
-torch==2.0.0
-torchvision==0.15.0
 tqdm==4.66.1

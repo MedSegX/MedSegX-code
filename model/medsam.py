@@ -27,7 +27,7 @@ class MedSAM(nn.Module):
         #     for param in sam.image_encoder.parameters():
         #         param.requires_grad = False
         for param in sam.image_encoder.parameters():
-                param.requires_grad = False
+            param.requires_grad = False
         for param in sam.prompt_encoder.parameters():
             param.requires_grad = False
         
