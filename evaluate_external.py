@@ -23,23 +23,27 @@ from model import *
 from data.dataset import TaskMedSegDB
 from utils.metric import SegmentMetrics
 
-
-# set up parser
+# setup parser
 parser = argparse.ArgumentParser("MedSedX external evaluating", add_help=False)
 # model
-parser.add_argument("--checkpoint", type=str, default="./playground/SAM")
-parser.add_argument("--model_type", type=str, default="vit_b")
-parser.add_argument("--model_weight", type=str, default="./playground/MedSegX/medsegx_vit_b.pth")
+parser.add_argument("--checkpoint", type=str, default="./playground/SAM",
+                    help="path to SAM checkpoint folder")
+parser.add_argument("--model_type", type=str, default="vit_b",
+                    help="SAM model scale (e.g vit_b, vit_l, vit_h)")
+parser.add_argument("--model_weight", type=str, default="./playground/MedSegX/medsegx_vit_b.pth",
+                    help="path to MedSegX model weight")
 parser.add_argument("--method", type=str, default="medsegx")
 parser.add_argument("--bottleneck_dim", type=int, default=16)
 parser.add_argument("--embedding_dim", type=int, default=16)
 parser.add_argument("--expert_num", type=int, default=4)
 # data
-parser.add_argument("--data_path", type=str, default="./playground/MedSegDB/example")
-parser.add_argument("--shift_type", type=str, default="cross_site")
+parser.add_argument("--data_path", type=str, default="./playground/MedSegDB/example",
+                    help="path to MedSegDB data folder")
+parser.add_argument("--shift_type", type=str, default="cross_site",
+                    help="external shift type (e.g cross_site, cross_task)")
 parser.add_argument("--metric", type=str, default=["dsc", "hd"], nargs='+',
                     help="evaluation metrics (e.g dsc, hd)")
-# env
+# eval
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--device_ids", type=int, default=[0,1,2,3,4,5,6,7], nargs='+',
                     help="device ids assignment (e.g 0 1 2 3)")
@@ -83,6 +87,8 @@ def evaluate(model, metric, dataloader, img_size, img_transform, box_transform,
             metric_list = {m: [] for m in args.metric}
             for m in args.metric:
                 result_list[m] = []
+            
+            # handle ambiguous segmentation
             for idx in range(model.module.sam.mask_decoder.num_multimask_outputs):
                 result_batch = metric(mask[:, idx].unsqueeze(1), label)
                 for m in args.metric:
@@ -93,6 +99,7 @@ def evaluate(model, metric, dataloader, img_size, img_transform, box_transform,
                 if m == "dsc":
                     result = dsc
                 else:
+                    # select other metrics based on the best DSC
                     result = torch.stack(result_list[m], dim=0)
                     result = result[max_idx, torch.arange(result.shape[1])]
                 metric_dict[m] = result.mean().item()
@@ -143,6 +150,7 @@ def main(args):
     img_transform = Resize((img_size, img_size), antialias=True)
     box_transform = ResizeLongestSide(img_size)
     
+    # cross-site (task, dataset) list
     site_list = [
         ("CBCT_Tooth", "DentalPanoramicRadiographsDataset"), ("CT_GallBladder", "Totalsegmentator_dataset"), 
         ("CT_LeftKidney", "BTCV"), ("CT_RightKidney", "BTCV"), 
@@ -154,6 +162,7 @@ def main(args):
         ("MRI_RightVentricularMyocardium", "MM"), ("MRI_Spleen", "CHAOS"), 
         ("xray_LeftLung", "ShenZhen"), ("xray_RightLung", "ShenZhen"), 
     ]
+    # cross-task (task, dataset) list
     task_list = [
         ("CT_ColonCancer", "MSD_Task10"), ("CT_KidneyTumor", "KiPA22"), 
         ("CT_KidneyTumor", "KiTS19"), ("CT_LiverCancer", "MSD_Task03"), 
@@ -177,16 +186,19 @@ def main(args):
     with open(join(work_dir, '{}.md'.format(args.shift_type)), mode="w") as f:
         f.write(f"# external {args.shift_type} evaluation\n\n")
         data_path = join(args.data_path, "external", args.shift_type)
+        # iterate over tasks
         for task in sorted(os.listdir(data_path)):
             if task not in [item[0] for item in check_list]:
                 continue
             f.write(f"- {task}\n")
             task_path = join(data_path, task)
+            # iterate over datasets
             for dataset in sorted(os.listdir(task_path)):
                 dataset_path = join(task_path, dataset)
                 if (task, dataset) not in check_list:
                     continue
                 
+                # do not have different sequences
                 if 'inference' in os.listdir(dataset_path):
                     test_dataset = TaskMedSegDB(join(dataset_path, "inference"), train=False)
                     test_dataloader = DataLoader(
@@ -207,6 +219,7 @@ def main(args):
                     result_task = ", ".join([f"{k.upper()} ({v:.4f})" for k, v in metric_task.items()])
                     f.write(f"  - {dataset}: {result_task}\n")
                 
+                # have different sequences
                 else:
                     f.write(f"  - {dataset}\n")
                     for sequence in sorted(os.listdir(dataset_path)):
@@ -246,6 +259,7 @@ def main(args):
     time_end = time.time()
     print(f"Time cost: {time_end - time_start:.0f} s")
     
+    # record instance-level results
     df = pd.DataFrame(meta)
     df.to_csv(f"{work_dir}/{args.shift_type}.csv", index=False)
 

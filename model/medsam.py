@@ -19,13 +19,6 @@ class MedSAM(nn.Module):
         super().__init__()
         
         # freeze SAM image and prompt encoder
-        # if sam.image_encoder.img_size != 1024:
-        #     for n, p in sam.image_encoder.named_parameters():
-        #         if 'pos' not in n:
-        #             p.requires_grad = False
-        # else:
-        #     for param in sam.image_encoder.parameters():
-        #         param.requires_grad = False
         for param in sam.image_encoder.parameters():
             param.requires_grad = False
         for param in sam.prompt_encoder.parameters():

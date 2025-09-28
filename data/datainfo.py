@@ -1,30 +1,3 @@
-dimension_dict = {
-    "CBCT": "2D", 
-    "Colon": "2D",
-    "Colonos": "2D",
-    "Colonoscopy": "2D",
-    "CT": "3D",
-    "CTA": "2D",
-    "Dermos": "2D",
-    "Dermoscopy": "2D",
-    "Endos": "2D",
-    "Endoscope": "2D",
-    "Fundus": "2D",
-    "Funduscopy": "2D",
-    "MRI": "3D",
-    "US": "2D",
-    "xray": "2D",
-    "Xray": "2D",
-}
-
-dimension_map = {
-    "2D": 0,
-    "3D": 1,
-}
-
-dimension_map_inv = {v: k for k, v in dimension_map.items()}
-dimension_map_idx = {k: i for i, k in enumerate(dimension_map_inv.keys())}
-
 modal_dict = {
     "CBCT": "CBCT", 
     "Colon": "Colonos",
@@ -43,7 +16,6 @@ modal_dict = {
     "xray": "Xray",
     "Xray": "Xray",
 }
-
 modal_map = {
     "CBCT": 0, 
     "Colonos": 1,
@@ -87,7 +59,6 @@ organ_level_1_dict = {
                "Aorta", "AscendingAorta", "TL", "FL", "FLT", "Postcava"], 
     "skin": ["Skin"], 
 }
-
 organ_level_1_map = {
     "head&neck": 0,
     "body": 1,
@@ -129,7 +100,6 @@ organ_level_2_dict = {
                "Aorta", "AscendingAorta", "TL", "FL", "FLT", "Postcava"], 
     "skin": ["Skin"],
 }
-
 organ_level_2_map = {
     "head": 0,
     "face": 1,
@@ -198,7 +168,6 @@ organ_level_3_dict = {
                "Aorta", "AscendingAorta", "TL", "FL", "FLT", "Postcava"], 
     "skin": ["Skin"],
 }
-
 organ_level_3_map = {
     "brain": 0,
     "hippocampus": 1,

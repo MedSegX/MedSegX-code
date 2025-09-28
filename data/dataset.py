@@ -89,7 +89,6 @@ class TaskMedSegDB(Dataset):
         files = sorted(os.listdir(join(data_root, "npy_gts")))
         self.file_names = [join(data_root, "npy_gts", f) for f in files]
         
-        # self.task = data_root.split("/")[-3]
         if "inference" in data_root:
             self.task = data_root.split('/')[-4]
             if "cross" in self.task:
