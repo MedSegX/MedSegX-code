@@ -6,22 +6,22 @@ MedSedX fine-tuning script
 # setup environment
 import argparse
 import copy
-from datetime import datetime
 import os
 join = os.path.join
-import random
 import json
 
+import numpy as np
+import random
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import Resize
-import numpy as np
-
-import matplotlib.pyplot as plt
 from tqdm import tqdm
+
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 from segment_anything import sam_model_registry, sam_model_checkpoint
 from segment_anything.utils.transforms import ResizeLongestSide
@@ -30,10 +30,9 @@ from data.dataset import TaskMedSegDB
 from utils.loss import DiceBCELoss
 from utils.logger import get_logger
 from utils.metric import SegmentMetrics
-from utils.scheduler import adjust_learning_rate
 
-# set seeds
-seed = 2023
+# setup seeds
+seed = 2025
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -43,42 +42,42 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
-# set up parser
+# setup parser
 parser = argparse.ArgumentParser("MedSedX finetuning", add_help=False)
-parser.add_argument("--model_type", type=str, default="vit_b")
-parser.add_argument("--task_name", type=str, default="MedSegX_256")
+# model
+parser.add_argument("--checkpoint", type=str, default="./playground/SAM",
+                    help="path to SAM checkpoint folder")
+parser.add_argument("--model_type", type=str, default="vit_b",
+                    help="SAM model scale (e.g vit_b, vit_l, vit_h)")
+parser.add_argument("--task_name", type=str, default="MedSegX")
 parser.add_argument("--method", type=str, default="medsegx")
 parser.add_argument("--bottleneck_dim", type=int, default=16)
 parser.add_argument("--embedding_dim", type=int, default=16)
 parser.add_argument("--expert_num", type=int, default=4)
-parser.add_argument("--checkpoint", type=str, default="/path/to/SAM")
-parser.add_argument("--data_path", type=str, default="/path/to/MedSegDB")
+# data
+parser.add_argument("--data_path", type=str, default="./playground/MedSegDB",
+                    help="path to MedSegDB data folder")
 parser.add_argument("--shift_type", type=str, default="cross_site")
-parser.add_argument("--data_dim", type=str, default="2D")
+# env
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--device_ids", type=int, default=[0,1,2,3,4,5,6,7], nargs='+',
                     help="device ids assignment (e.g 0 1 2 3)")
-parser.add_argument("--work_dir", type=str, default="./work_dir")
+parser.add_argument("--work_dir", type=str, default="./playground")
 # train
 parser.add_argument("--num_epochs", type=int, default=30)
 parser.add_argument("--batch_size", type=int, default=64)
 parser.add_argument("--num_workers", type=int, default=32)
-parser.add_argument("--validation", type=str, default="val")
+parser.add_argument("--validation", type=str, default="val",
+                    help="validation split (e.g val, test)")
 parser.add_argument("--resume", type=str, default=None, 
-                    help="Resuming training from checkpoint")
-# Optimizer parameters
-parser.add_argument("--weight_decay", type=float, default=0.01, 
-                    help="weight decay (default: 0.01)")
+                    help="resume training from checkpoint")
+# optimizer
 parser.add_argument("--lr", type=float, default=0.00005, metavar="LR", 
                     help="learning rate (absolute lr default: 0.00005)")
-parser.add_argument('--min_lr', type=float, default=1e-6, metavar='LR',
-                    help='lower lr bound for cyclic schedulers that hit 0')
-parser.add_argument("--warmup_epochs", type=int, default=5, 
-                    help="number of warmup epochs (default: 5)")
-parser.add_argument("--lr_scheduler", type=str, default="cosine", 
-                    help="learning rate scheduler type (default: cosine)")
+parser.add_argument("--weight_decay", type=float, default=0.01, 
+                    help="weight decay (default: 0.01)")
 parser.add_argument("--use_amp", action="store_true", default=False, 
-                    help="use amp")
+                    help="whether to use amp")
 
 
 def main(args):
@@ -87,8 +86,8 @@ def main(args):
     checkpoint = join(args.checkpoint, sam_model_checkpoint[args.model_type])
     sam_model = sam_model_registry[args.model_type](image_size=256, keep_resolution=True, checkpoint=checkpoint)
     if args.method == "medsam":
-        model = medsam(sam_model).to(device)
-    elif args.method == "treemoeadapter":
+        model = MedSAM(sam_model).to(device)
+    elif args.method == "medsegx":
         model = MedSegX(sam_model, args.bottleneck_dim, args.embedding_dim, args.expert_num).to(device)
     else:
         raise NotImplementedError("Method {} not implemented!".format(args.method))
@@ -97,7 +96,7 @@ def main(args):
     model = nn.DataParallel(model, device_ids=args.device_ids)
     dsc_metric = nn.DataParallel(dsc_metric, device_ids=args.device_ids)
     
-    work_dir = join(args.work_dir, args.data_dim, args.task_name)
+    work_dir = join(args.work_dir, args.task_name)
     if args.resume is not None:
         if os.path.isfile(args.resume):
             ## Map model to be loaded to specified single GPU
@@ -105,7 +104,7 @@ def main(args):
             checkpoint = torch.load(args.resume, map_location=device)
             model.module.load_parameters(checkpoint["model"])
         work_dir = os.path.dirname(args.resume)
-    work_dir = join(work_dir, f"finetune_{args.lr}", args.shift_type)
+    work_dir = join(work_dir, "finetune", args.shift_type)
     os.makedirs(work_dir, exist_ok=True)
     logger = get_logger(log_file=os.path.join(work_dir, 'output.log'))
     logger.info(f"args: {json.dumps(vars(args), indent=2)}")
@@ -114,7 +113,7 @@ def main(args):
     logger.info(
         "Number of total parameters: %d" % (
             sum(p.numel() for p in model.parameters()))
-    )  # 93735472: (image_encoder: 89670912, prompt_encoder: 6220, mask_decoder: 4058340)
+    )
     logger.info(
         "Number of trainable parameters: %d" % (
             sum(p.numel() for p in model.parameters() if p.requires_grad))
@@ -147,7 +146,7 @@ def main(args):
     elif args.shift_type == "cross_task":
         check_list = task_list
     
-    data_path = join(args.data_path, args.data_dim, "OOD", args.shift_type)
+    data_path = join(args.data_path, "external", args.shift_type)
     for task in sorted(os.listdir(data_path)):
         task_path = join(data_path, task)
         for dataset in sorted(os.listdir(task_path)):
@@ -169,8 +168,6 @@ def main(args):
             
             finetune_path = join(dataset_path, "finetune")
             for percent in sorted(os.listdir(finetune_path)):
-                if percent != "005_percent":
-                    continue
                 train_dataset = TaskMedSegDB(join(finetune_path, percent), train=True)
                 if len(train_dataset) == 0:
                     continue
@@ -233,7 +230,6 @@ def main(args):
                     for data, label in pbar_train:
                         optimizer.zero_grad()
                         step += 1
-                        adjust_learning_rate(optimizer, epoch + step / len(train_dataloader), args)
             
                         if data["img"].shape[-1] != img_size:
                             data["box"] = box_transform.apply_boxes_torch((data["box"].reshape(-1, 2, 2)), 
@@ -316,6 +312,7 @@ def main(args):
                     
                     logger.info(f"Epoch [{epoch}] - LR: {lr}, Loss: {epoch_loss}, DSC: {epoch_dsc}")
                     
+                    ## save the best model
                     if epoch_dsc > best_dsc:
                         best_dsc = epoch_dsc
                         best_epoch = epoch

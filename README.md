@@ -23,12 +23,6 @@ Vision foundation models have demonstrated vast potential in achieving generalis
 
 🔥 **[2025/08/05]** Our paper is accepted by Nature Biomedical Engineering!
 
-## 📝 TODO
-
-- [x] Evaluation Instructions
-- [ ] Pretraining Instructions
-- [ ] Finetuning Instructions
-
 ## ⚙️ Setup
 
 ### 🏝️ Environment
@@ -76,9 +70,9 @@ playground/
 
 ### 📊 Data
 
-We provide an example dataset for demonstrating the inference of our MedSegX. You can download this dataset from [Google Drive](https://drive.google.com/file/d/1MqI5m-lrRMqQghhbiXAdcgHFRLEuNtPN/view?usp=share_link).
+We provide an example dataset for trail use, which can be downloaded from [Google Drive](https://drive.google.com/file/d/1MqI5m-lrRMqQghhbiXAdcgHFRLEuNtPN/view?usp=share_link).
 
-The whole MedSegDB is constructed from public medical image segmentation datasets, and it is available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB).
+The whole MedSegDB is constructed from public medical segmentation datasets, which is available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB).
 
 For additional information about the datasets or their licenses, please reach out to the owners.
 
@@ -111,6 +105,7 @@ playground/
 │       ├── cross_site/
 │       │   ├── task1/
 │       │   │   ├── dataset1/
+│       │   │   │   ├── finetune/
 │       │   │   │   └── inference/
 │       │   │   ├── dataset2/
 │       │   │   ├── .../
@@ -124,7 +119,24 @@ playground/
 
 ## 🛠️ Usage
 
-<!-- ### 🚀 Training -->
+### 🚀 Training
+
+After preparing the whole MedSegDB, you can train MedSegX using the following command:
+```bash
+python pretrain.py
+```
+
+This command trains MedSegX on 8 GPUs by default, with the batch size of 1024, requiring at least 40GB memory for each GPU. You can set the `device_ids` and `batch_size` arguments for different machine. For example, if you want to train MedSegX on a single GPU, you can use the following command:
+```bash
+python pretrain.py --device_ids 0 --batch_size 128 --lr 1e-4
+```
+
+After pre-training, you can further fine-tune MedSegX on the downstream tasks by using the following command:
+```bash
+python finetune.py
+```
+
+Similarly, 8 GPUs are used for training by default. You can adjust the same arguments for different machines.
 
 ### 🧪 Evaluation
 

@@ -5,23 +5,23 @@ MedSedX pre-training script
 
 # setup environment
 import argparse
-from datetime import datetime, timedelta
 import os
 join = os.path.join
-import random
 import time
 import json
 
+import numpy as np
+import random
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import Resize
-import numpy as np
-
-import matplotlib.pyplot as plt
 from tqdm import tqdm
+
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
 
 from segment_anything import sam_model_registry, sam_model_checkpoint
 from segment_anything.utils.transforms import ResizeLongestSide
@@ -30,10 +30,9 @@ from data.dataset import GeneralMedSegDB
 from utils.loss import DiceBCELoss
 from utils.logger import get_logger
 from utils.metric import SegmentMetrics
-from utils.scheduler import adjust_learning_rate
 
-# set seeds
-seed = 2023
+# setup seeds
+seed = 2025
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -43,50 +42,49 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
-# set up parser
+# setup parser
 parser = argparse.ArgumentParser("MedSedX training", add_help=False)
-parser.add_argument("--model_type", type=str, default="vit_b")
-parser.add_argument("--task_name", type=str, default="MedSegX_256")
+# model
+parser.add_argument("--checkpoint", type=str, default="./playground/SAM",
+                    help="path to SAM checkpoint folder")
+parser.add_argument("--model_type", type=str, default="vit_b",
+                    help="SAM model scale (e.g vit_b, vit_l, vit_h)")
+parser.add_argument("--task_name", type=str, default="MedSegX_test")
 parser.add_argument("--method", type=str, default="medsegx")
 parser.add_argument("--bottleneck_dim", type=int, default=16)
 parser.add_argument("--embedding_dim", type=int, default=16)
 parser.add_argument("--expert_num", type=int, default=4)
-parser.add_argument("--checkpoint", type=str, default="/path/to/SAM")
-parser.add_argument("--data_path", type=str, default="/path/to/MedSegDB")
-parser.add_argument("--data_dim", type=str, default="2D")
+# data
+parser.add_argument("--data_path", type=str, default="./playground/MedSegDB",
+                    help="path to MedSegDB data folder")
+# env
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument("--device_ids", type=int, default=[0,1,2,3,4,5,6,7], nargs='+',
                     help="device ids assignment (e.g 0 1 2 3)")
-parser.add_argument("--work_dir", type=str, default="./work_dir")
+parser.add_argument("--work_dir", type=str, default="./playground")
 # train
 parser.add_argument("--num_epochs", type=int, default=30)
 parser.add_argument("--batch_size", type=int, default=1024)
-parser.add_argument("--num_workers", type=int, default=64)
+parser.add_argument("--num_workers", type=int, default=32)
 parser.add_argument("--resume", type=str, default=None, 
-                    help="Resuming training from checkpoint")
-# Optimizer parameters
-parser.add_argument("--weight_decay", type=float, default=0., 
-                    help="weight decay (default: 0.)")
+                    help="resume training from checkpoint")
+# optimizer
 parser.add_argument("--lr", type=float, default=0.001, metavar="LR", 
                     help="learning rate (absolute lr default: 0.001)")
-parser.add_argument('--min_lr', type=float, default=1e-6, metavar='LR',
-                    help='lower lr bound for cyclic schedulers that hit 0')
-parser.add_argument("--warmup_epochs", type=int, default=5, 
-                    help="number of warmup epochs (default: 5)")
-parser.add_argument("--lr_scheduler", type=str, default="cosine", 
-                    help="learning rate scheduler type (default: cosine)")
+parser.add_argument("--weight_decay", type=float, default=0.01, 
+                    help="weight decay (default: 0.01)")
 parser.add_argument("--use_amp", action="store_true", default=False, 
-                    help="use amp")
+                    help="whether to use amp")
 
 
 def main(args):
     device = torch.device(args.device)
-
+    
     checkpoint = join(args.checkpoint, sam_model_checkpoint[args.model_type])
     sam_model = sam_model_registry[args.model_type](image_size=256, keep_resolution=True, checkpoint=checkpoint)
     if args.method == "medsam":
-        model = medsam(sam_model).to(device)
-    elif args.method == "treemoeadapter":
+        model = MedSAM(sam_model).to(device)
+    elif args.method == "medsegx":
         model = MedSegX(sam_model, args.bottleneck_dim, args.embedding_dim, args.expert_num).to(device)
     else:
         raise NotImplementedError("Method {} not implemented!".format(args.method))
@@ -95,7 +93,7 @@ def main(args):
     model = nn.DataParallel(model, device_ids=args.device_ids)
     dsc_metric = nn.DataParallel(dsc_metric, device_ids=args.device_ids)
     
-    work_dir = join(args.work_dir, args.data_dim, args.task_name)
+    work_dir = join(args.work_dir, args.task_name)
     os.makedirs(work_dir, exist_ok=True)
     log_writer = SummaryWriter(log_dir=work_dir)
     logger = get_logger(log_file=os.path.join(work_dir, 'output.log'))
@@ -115,12 +113,10 @@ def main(args):
         filter(lambda p: p.requires_grad, model.parameters()),
         lr=args.lr, weight_decay=args.weight_decay
     )
-    pos_weight = None
-    # pos_weight = torch.tensor([81018774276/3103300860], dtype=torch.float32, device=device)
-    criterion = DiceBCELoss(sigmoid=True, squared_pred=True, reduction='none', pos_weight=pos_weight)
+    criterion = DiceBCELoss(sigmoid=True, squared_pred=True, reduction='none')
     logger.info("Criterion: %s" % str(criterion))
 
-    train_dataset = GeneralMedSegDB(join(args.data_path, args.data_dim, "pretrain"), train=True)
+    train_dataset = GeneralMedSegDB(join(args.data_path, "pretrain"), train=True)
     logger.info(f"Number of training samples: {len(train_dataset)}")
     train_dataloader = DataLoader(
         train_dataset,
@@ -131,7 +127,7 @@ def main(args):
         drop_last=True,
     )
     
-    val_dataset = GeneralMedSegDB(join(args.data_path, args.data_dim, "ID"), train=False)
+    val_dataset = GeneralMedSegDB(join(args.data_path, "internal"), train=False)
     logger.info(f"Number of validation samples: {len(val_dataset)}")
     val_dataloader = DataLoader(
         val_dataset,
@@ -177,7 +173,6 @@ def main(args):
         for data, label in pbar_train:
             optimizer.zero_grad()
             step += 1
-            adjust_learning_rate(optimizer, epoch + step / len(train_dataloader), args)
             
             if data["img"].shape[-1] != img_size:
                 data["box"] = box_transform.apply_boxes_torch((data["box"].reshape(-1, 2, 2)), 
@@ -237,6 +232,7 @@ def main(args):
             "epoch": epoch,
         }
         torch.save(checkpoint, join(work_dir, "model_latest.pth"))
+
         ## save the lowest model
         if epoch_loss < best_loss:
             best_loss = epoch_loss
@@ -246,6 +242,7 @@ def main(args):
                 "epoch": epoch,
             }
             torch.save(checkpoint, join(work_dir, "model_lowest.pth"))
+        
         ## save the model
         if True:
             checkpoint = {
@@ -335,10 +332,6 @@ def main(args):
     total_time_str = str(timedelta(seconds=int(total_time)))
     logger.info(f"Best epoch: {best_epoch}, Best DSC: {best_dsc}")
     logger.info(f"Time cost: {total_time_str}")
-    
-    # os.system(f"python evaluate_id.py --method {args.method} --bottleneck_dim {args.bottleneck_dim} --embedding_dim {args.embedding_dim} --resume {join(work_dir, 'model_best.pth')}")
-    # os.system(f"python evaluate_ood.py --method {args.method} --bottleneck_dim {args.bottleneck_dim} --embedding_dim {args.embedding_dim} --shift_type distribution_shift --resume {join(work_dir, 'model_best.pth')}")
-    # os.system(f"python evaluate_ood.py --method {args.method} --bottleneck_dim {args.bottleneck_dim} --embedding_dim {args.embedding_dim} --shift_type task_shift --resume {join(work_dir, 'model_best.pth')}")
 
 
 if __name__ == "__main__":
