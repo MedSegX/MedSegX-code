@@ -4,7 +4,6 @@
 
 Siqi Zhang*, Qizhe Zhang*, Shanghang Zhang*†, Xiaohong Liu*, Jingkun Yue*, Ming Lu, Huihuan Xu, Jiaxin Yao, Xiaobao Wei, Jiajun Cao, Xiang Zhang, Ming Gao, Jun Shen, Yichang Hao, Yinkui Wang, Xingcai Zhang, Song Wu, Ping Zhang, Shuguang Cui & Guangyu Wang†
 
-
 [Nature Biomedical Engineering (2025)](https://www.nature.com/articles/s41551-025-01497-3): https://www.nature.com/articles/s41551-025-01497-3
 
 *Corresponding Authors: Guangyu Wang, Shanghang Zhang.*
@@ -64,57 +63,183 @@ playground/
 │   ├── sam_vit_b_01ec64.pth
 │   ├── sam_vit_l_0b3195.pth
 │   └── sam_vit_h_4b8939.pth
-├── MedSegX/
-│   └── medsegx_vit_b.pth
+└── MedSegX/
+    └── medsegx_vit_b.pth
 ```
 
 ### 📊 Data
 
-We provide an example dataset for trail use, which can be downloaded from [Google Drive](https://drive.google.com/file/d/1MqI5m-lrRMqQghhbiXAdcgHFRLEuNtPN/view?usp=share_link).
+We provide an example dataset to enable users to easily and quickly perform inference with our MedSegX. You can download the example data from [Google Drive](https://drive.google.com/file/d/1MqI5m-lrRMqQghhbiXAdcgHFRLEuNtPN/view?usp=share_link).
 
-The whole MedSegDB is constructed from public medical segmentation datasets, which is available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB).
+The pre-training, ID and OOD datasets from our MedSegDB database are curated from open-source datasets and can be accessed via the weblinks provided in Supplementary Table 1 (see Supplementary Information). Among these, the data in MedSegDB that permit redistribution are available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB), in which the data is fully preprocessed and can be used out of the box. No further preprocessing is needed before model training or inference.
 
-For additional information about the datasets or their licenses, please reach out to the owners.
+The datasets should also be placed in the `./playground` directory. 
 
-The datasets should also be placed in the `./playground` directory, with the following structure:
+When using the data for pre-training and ID evaluation, please organize them in the following structure:
 ```
 playground/
-├── MedSegDB/
-│   ├── internal/
-│   │   ├── dataset1/
-│   │   │   ├── task1/
-│   │   │   │   ├── npy_imgs/
-│   │   │   │   │   ├── case1.npy/
-│   │   │   │   │   ├── case2.npy/
-│   │   │   │   │   ├── ...
-│   │   │   │   └── npy_gts/
-│   │   │   │       ├── case1.npy/
-│   │   │   │       ├── case2.npy/
-│   │   │   │       ├── ...
-│   │   │   ├── task2/
-│   │   │   │   ├── sequence1/
-│   │   │   │   │   ├── npy_imgs/
-│   │   │   │   │   └── npy_gts/
-│   │   │   │   ├── sequence2/
-│   │   │   │   ├── ...
-│   │   │   ├── task3/
-│   │   │   ├── ...
-│   │   ├── dataset2/
-│   │   ├── ...
-│   └── external/
-│       ├── cross_site/
-│       │   ├── task1/
-│       │   │   ├── dataset1/
-│       │   │   │   ├── finetune/
-│       │   │   │   └── inference/
-│       │   │   ├── dataset2/
-│       │   │   ├── .../
-│       │   ├── task2/
-│       │   ├── ...
-│       └── cross_task/
-│           ├── task1/
-│           ├── task2/
-│           ├── ...
+└── MedSegDB/
+    └── ID/
+        ├── dataset1/
+        │   ├── modality_task1/
+        │   │   ├── npy_imgs/                   # preprocessed images in .npy format
+        │   │   └── npy_gts/                    # corresponding ground truth labels
+        │   ├── modality_task2/
+        │   │   ├── npy_imgs/
+        │   │   └── npy_gts/
+        │   └── ...                             # other modality-task pairs
+        ├── dataset2/
+        │   ├── modality_task1/
+        │   │   ├── sequence1/                  # if multiple sequences exist
+        │   │   │   ├── npy_imgs/
+        │   │   │   └── npy_gts/
+        │   │   ├── sequence2/
+        │   │   │   ├── npy_imgs/
+        │   │   │   └── npy_gts/
+        │   │   └── ...                         # other sequences if available
+        │   └── ...                             # other modality-task pairs
+        └── ...                                 # other datasets
+```
+
+For example,
+```
+playground/
+└── MedSegDB/
+    └── ID/
+        ├── ACDC/
+        │   ├── MRI_LeftVentricle/
+        │   │   ├── npy_imgs/
+        │   │   └── npy_gts/
+        │   ├── MRI_MitralValve/
+        │   │   ├── npy_imgs/
+        │   │   └── npy_gts/
+        │   └── ...                             # other modality-task pairs
+        ├── BraTS2020/
+        │   ├── MRI_BrainCoreTumor/
+        │   │   ├── FLAIR/
+        │   │   │   ├── npy_imgs/
+        │   │   │   └── npy_gts/
+        │   │   ├── T1/
+        │   │   │   ├── npy_imgs/
+        │   │   │   └── npy_gts/
+        │   │   └── ...                         # other sequences
+        │   └── ...                             # other modality-task pairs
+        └── ...                                 # other datasets
+```
+
+When using the data for OOD (or real-world) evaluation, please organize them in the following structure:
+```
+playground/
+└── MedSegDB/
+    └── OOD/
+        ├── cross_site/                         # cross-site shift
+        │   ├── modality_task1/
+        │   │   ├── dataset1/
+        │   │   │   ├── finetune/               # fine-tune data
+        │   │   │   │   ├── 005_percent/        # different fine-tune percents
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   ├── 015_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   ├── 025_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   ├── 050_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   └── 100_percent/
+        │   │   │   │       ├── npy_imgs/
+        │   │   │   │       └── npy_gts/
+        │   │   │   └── inference/              # inference data
+        │   │   │       ├── npy_imgs/
+        │   │   │       └── npy_gts/
+        │   │   ├── dataset2/
+        │   │   └── ...                         # other datasets
+        │   ├── modality_task2/
+        │   │   ├── dataset1/
+        │   │   │   ├── sequence1/              # if multiple sequences exist
+        │   │   │   │   ├── finetune/
+        │   │   │   │   │   ├── 005_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   ├── 015_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   ├── 025_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   ├── 050_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   └── 100_percent/
+        │   │   │   │   │       ├── npy_imgs/
+        │   │   │   │   │       └── npy_gts/
+        │   │   │   │   └── inference/
+        │   │   │   │       ├── npy_imgs/
+        │   │   │   │       └── npy_gts/
+        │   │   │   ├── sequence2/
+        │   │   │   └── ...                     # other sequences if available
+        │   │   ├── dataset2/
+        │   │   └── ...                         # other datasets
+        │   └── ...                             # other modality-task pairs
+        └── cross_task/                         # cross-task shift
+```
+
+For example,
+```
+playground/
+└── MedSegDB/
+    └── OOD/
+        ├── cross_site/
+        │   ├── CT_Liver/
+        │   │   ├── SLIVER07/
+        │   │   │   ├── finetune/
+        │   │   │   │   ├── 005_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   ├── 015_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   ├── 025_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   ├── 050_percent/
+        │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   └── npy_gts/
+        │   │   │   │   └── 100_percent/
+        │   │   │   │       ├── npy_imgs/
+        │   │   │   │       └── npy_gts/
+        │   │   │   └── inference/
+        │   │   │       ├── npy_imgs/
+        │   │   │       └── npy_gts/
+        │   │   └── ...                         # other datasets
+        │   ├── MRI_Spleen/
+        │   │   ├── CHAOS/
+        │   │   │   ├── T2W/
+        │   │   │   │   ├── finetune/
+        │   │   │   │   │   ├── 005_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   ├── 015_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   ├── 025_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   ├── 050_percent/
+        │   │   │   │   │   │   ├── npy_imgs/
+        │   │   │   │   │   │   └── npy_gts/
+        │   │   │   │   │   └── 100_percent/
+        │   │   │   │   │       ├── npy_imgs/
+        │   │   │   │   │       └── npy_gts/
+        │   │   │   │   └── inference/
+        │   │   │   │       ├── npy_imgs/
+        │   │   │   │       └── npy_gts/
+        │   │   │   └── ...                     # other sequences
+        │   │   └── ...                         # other datasets
+        │   └── ...                             # other modality-task pairs
+        └── cross_task/
 ```
 
 ## 🛠️ Usage
@@ -172,4 +297,3 @@ This project is released under the [Apache 2.0 license](LICENSE).
 ## 🏅 Acknowledgement
 
 We appreciate the open-source efforts of [SAM](https://github.com/facebookresearch/segment-anything) and [MedSAM](https://github.com/bowang-lab/MedSAM) teams.
-
