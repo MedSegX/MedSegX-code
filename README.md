@@ -69,11 +69,11 @@ playground/
 
 ### 📊 Data
 
-We provide an [example dataset](playground/example_data.zip) to help users get started with MedSegX quickly. This example dataset has already been organized according to the complete MedSegDB structure. You only need to unzip it to the `./playground/MedSegDB-example` directory. Then, you can directly go to the [Quick Start](#-quick-start) section to perform a fast inference.
+We provide an [example dataset](playground/example_data.zip) to help users get started with MedSegX quickly. This example dataset has already been organized according to the complete MedSegDB structure. You only need to unzip it to the `./playground` directory. Then, you can directly go to the [Quick Start](#-quick-start) section to perform a fast inference.
 
 Our MedSegDB are curated from open-source medical segmentation datasets, which can be accessed via the weblinks provided in [Supplementary Table 1](https://static-content.springer.com/esm/art%3A10.1038%2Fs41551-025-01497-3/MediaObjects/41551_2025_1497_MOESM1_ESM.pdf). Among them, the datasets that permit redistribution are available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB), where the data is fully preprocessed and can be used out of the box without any further processing.
 
-The whole MedSegDB should also be placed in the `./playground` directory and organized in the following structure:
+The whole MedSegDB should be placed in the `./playground` directory and organized in the following structure:
 ```
 playground/
 └── MedSegDB/
@@ -94,7 +94,7 @@ For more details about data structure of MedSegDB, please see [DATA.md](docs/DAT
 
 ### 🚀 Quick Start
 
-After preparing the model weights and the example dataset, you can easily use the [`quick-start.sh`](scripts/quick-start.sh) script to perform inference with MedSegX. For example, if you want to conduct an ID evaluation, you can run the following command:
+After preparing the model weights and example dataset, you can easily use the [`quick-start.sh`](scripts/quick-start.sh) to perform inference with MedSegX. For example, if you want to conduct an ID evaluation, you can run the following command:
 ```bash
 python evaluate_internal.py \
     --checkpoint ./playground/SAM \
@@ -110,7 +110,7 @@ After running the above script, the results will be saved in the `./playground/M
 
 ### 🏗️ Training
 
-After preparing the whole MedSegDB according to [DATA.md](docs/DATA.md), you can use the following command to train MedSegX:
+After preparing MedSegDB according to [DATA.md](docs/DATA.md), you can use the following command to train MedSegX:
 ```bash
 python pretrain.py \
     --checkpoint ./playground/SAM \
@@ -154,7 +154,7 @@ python finetune.py \
     --use_amp
 ```
 
-Similarly, if you want to perform fine-tuning on cross-task shift using a single GPU, you can use the following command:
+Similarly, if you want to fine-tune on cross-task shift using a single GPU, you can use the following command:
 ```bash
 python finetune.py \
     --checkpoint ./playground/SAM \
