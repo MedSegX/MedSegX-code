@@ -94,7 +94,7 @@ For more details about data structure of MedSegDB, please see [DATA.md](docs/DAT
 
 ### 🚀 Quick Start
 
-After preparing the model weights and example dataset, you can easily use the [`quick-start.sh`](scripts/quick-start.sh) to perform inference with MedSegX. For example, if you want to conduct an ID evaluation, you can run the following command:
+After preparing the model weights and example dataset, you can easily use the [`quick-start.sh`](scripts/quick-start.sh) to perform inference with MedSegX. For example, you can run the following command for conducting an ID evaluation:
 ```bash
 python evaluate_internal.py \
     --checkpoint ./playground/SAM \
