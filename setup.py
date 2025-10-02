@@ -13,5 +13,5 @@ setup(
     description='A generalist foundation model and database for open-world medical image segmentation',
     author="Qizhe Zhang",
     python_requires=">=3.10",
-    install_requires=["matplotlib", "monai", "numpy", "opencv-python", "pandas", "scikit-image", "scipy", "tqdm"],
+    install_requires=["matplotlib", "monai", "numpy", "opencv-python", "pandas", "scikit-image", "scipy", "tensorboard", "tqdm"],
 )

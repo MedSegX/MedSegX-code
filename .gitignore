@@ -1,0 +1,25 @@
+# Python
+__pycache__
+*.pyc
+*.egg-info
+dist
+
+# Data
+playground/MedSegDB*
+
+# Model
+*.pth
+playground/MedSAM
+playground/MedSegX_old
+playground/MedSegX/*.pth
+playground/MedSegX/*.png
+playground/MedSegX/*.log
+playground/MedSegX/events.out*
+playground/MedSegX/*.csv
+playground/MedSegX/*.md
+playground/MedSegX/internal*
+playground/MedSegX/external*
+playground/MedSegX/finetune*
+
+# Script
+

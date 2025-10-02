@@ -36,12 +36,12 @@ class MoEAdaptMLPBlock(nn.Module):
         super().__init__()
         self.mlp = mlp
         self.expert_num = expert_num
-        
+
         dim = mlp.embedding_dim
         self.adapter_input_embed = nn.Linear(dim, embedding_dim)
         self.adapter_gate = nn.Linear(embedding_dim * embedding_num, expert_num)
         self.adapter_organ_gate = nn.Linear(embedding_dim * 4, 4)
-        
+
         self.adapter_down = nn.ModuleList([
             nn.Linear(dim, adapter_bn) for _ in range(expert_num)
         ])
@@ -54,9 +54,9 @@ class MoEAdaptMLPBlock(nn.Module):
             self.adapter_scale = nn.Parameter(torch.ones(1))
         else:
             self.adapter_scale = adapter_scalar
-        
+
         self.reset_parameters()
-    
+
     def reset_parameters(self) -> None:
         for i in range(self.expert_num):
             nn.init.kaiming_uniform_(self.adapter_down[i].weight, a=math.sqrt(5))
@@ -72,21 +72,21 @@ class MoEAdaptMLPBlock(nn.Module):
                 self.adapter_act(self.adapter_down[i](x)),
                 p=self.adapter_dropout, training=self.training)))
         adpt = torch.stack(adpt, dim=1)
-        
+
         organ_0, organ_1, organ_2, organ_3, task = organ
         organ = torch.cat([organ_0, organ_1, organ_2, organ_3], dim=-1)
         organ_gate = self.adapter_organ_gate(organ)
         organ_gate = torch.softmax(organ_gate, dim=-1)
         organ = torch.stack([organ_0, organ_1, organ_2, organ_3], dim=1)
         organ = torch.einsum('bec,be->bc', organ, organ_gate)
-        
+
         input = x.mean(dim=1).mean(dim=1)
         input = self.adapter_input_embed(input)
-        
+
         gate = torch.cat([organ, task, modal, input], dim=-1)
         gate = self.adapter_gate(gate)
         gate = torch.softmax(gate, dim=1)
-        
+
         adpt = torch.einsum('bemnc,be->bmnc', adpt, gate)
         return self.mlp(x) + adpt * self.adapter_scale, gate
 
@@ -109,30 +109,30 @@ class MedSegX(nn.Module):
         assert bottleneck_dim > 0
         assert embedding_dim > 0
         assert expert_num > 0
-        
+
         # assign Adapter layer position (all layers by default)
         if pos:
             self.pos = pos
         else:
             self.pos = list(range(len(sam.image_encoder.blocks)))
-        
+
         # freeze SAM image and prompt encoder
         for param in sam.image_encoder.parameters():
             param.requires_grad = False
         for param in sam.prompt_encoder.parameters():
             param.requires_grad = False
-        
+
         # modality and organ embedding index
         modal_index = get_index(modal_map_idx)
         organ_index_1 = get_index(organ_level_1_map_idx)
         organ_index_2 = get_index(organ_level_2_map_idx)
         organ_index_3 = get_index(organ_level_3_map_idx)
-        
+
         sam.image_encoder.register_buffer('modal_index', modal_index, False)
         sam.image_encoder.register_buffer('organ_index_1', organ_index_1, False)
         sam.image_encoder.register_buffer('organ_index_2', organ_index_2, False)
         sam.image_encoder.register_buffer('organ_index_3', organ_index_3, False)
-        
+
         modal_embed = nn.Embedding(len(modal_map_idx), embedding_dim)
         organ_embed_0 = nn.Embedding(1, embedding_dim)
         organ_embed_1 = nn.Embedding(len(organ_level_1_map_idx), embedding_dim)
@@ -145,19 +145,19 @@ class MedSegX(nn.Module):
         nn.init.zeros_(organ_embed_2.weight)
         nn.init.zeros_(organ_embed_3.weight)
         nn.init.zeros_(organ_embed_4.weight)
-        
+
         sam.image_encoder.modal_embed = modal_embed
         sam.image_encoder.organ_embed = nn.ModuleList([
             organ_embed_0, organ_embed_1, 
             organ_embed_2, organ_embed_3, 
             organ_embed_4, 
         ])
-        
+
         # apply Adapter to SAM image encoder
         for idx, blk in enumerate(sam.image_encoder.blocks):
             if idx not in self.pos:
                 continue
-            
+
             # create moe adapter layers
             blk.mlp = MoEAdaptMLPBlock(
                 blk.mlp,
@@ -166,7 +166,7 @@ class MedSegX(nn.Module):
                 embedding_dim=embedding_dim,
                 adapter_bn=bottleneck_dim,
             )
-        
+
         self.sam = sam
 
     def save_parameters(self) -> dict:
@@ -176,25 +176,25 @@ class MedSegX(nn.Module):
             state_dict = self.sam.module.state_dict()
         else:
             state_dict = self.sam.state_dict()
-        
+
         # save adapter parameters
         adapter_tensors = {}
         for key, value in state_dict.items():
             if 'adapter' in key:
                 adapter_tensors[key] = value
-        
+
         # save image encoder parameters
         image_encoder_tensors = {}
         for key, value in state_dict.items():
             if 'modal_embed' in key or 'organ_embed' in key:
                 image_encoder_tensors[key] = value
-        
+
         # save prompt encoder parameters
         prompt_encoder_tensors = {}
         # for key, value in state_dict.items():
         #     if 'prompt_encoder' in key:
         #         prompt_encoder_tensors[key] = value
-        
+
         # save mask decoder parameters
         mask_decoder_tensors = {}
         for key, value in state_dict.items():
@@ -215,13 +215,13 @@ class MedSegX(nn.Module):
         adapter_values = [state_dict[k] for k in adapter_keys]
         adapter_new_state_dict = {k: v for k, v in zip(adapter_keys, adapter_values)}
         sam_dict.update(adapter_new_state_dict)
-        
+
         # load image encoder parameters
         image_encoder_keys = [k for k in sam_keys if 'modal_embed' in k or 'organ_embed' in k]
         image_encoder_values = [state_dict[k] for k in image_encoder_keys]
         image_encoder_new_state_dict = {k: v for k, v in zip(image_encoder_keys, image_encoder_values)}
         sam_dict.update(image_encoder_new_state_dict)
-        
+
         # load prompt encoder parameters
         # prompt_encoder_keys = [k for k in sam_keys if 'prompt_encoder' in k]
         # prompt_encoder_values = [state_dict[k] for k in prompt_encoder_keys]
@@ -233,19 +233,19 @@ class MedSegX(nn.Module):
         mask_decoder_values = [state_dict[k] for k in mask_decoder_keys]
         mask_decoder_new_state_dict = {k: v for k, v in zip(mask_decoder_keys, mask_decoder_values)}
         sam_dict.update(mask_decoder_new_state_dict)
-        
+
         self.sam.load_state_dict(sam_dict)
 
     def forward(self, data):
         img, box = data['img'], data['box']
         modal, organ = data['modal'], data['organ']
-        
+
         # modal and organ embedding
         B = img.shape[0]
-        
+
         modal_index = self.sam.image_encoder.modal_index[modal]
         modal_embed = self.sam.image_encoder.modal_embed(modal_index)
-        
+
         organ_1, organ_2, organ_3, organ_4 = organ
         organ_index_0 = torch.zeros(B, dtype=torch.long, device=img.device)
         organ_embed_0 = self.sam.image_encoder.organ_embed[0](organ_index_0)
@@ -255,24 +255,24 @@ class MedSegX(nn.Module):
         organ_embed_2 = self.sam.image_encoder.organ_embed[2](organ_index_2)
         organ_index_3 = self.sam.image_encoder.organ_index_3[organ_3]
         organ_embed_3 = self.sam.image_encoder.organ_embed[3](organ_index_3)
-        
+
         organ_embed_4 = self.sam.image_encoder.organ_embed[4](organ_4)
         organ_embed = (organ_embed_0, organ_embed_1, organ_embed_2, organ_embed_3, organ_embed_4)
-        
+
         # prompt encoder
         if len(box.shape) == 2:
             box = box[:, None, :]  # (B, 1, 4)
-        
+
         sparse_embeddings, dense_embeddings = self.sam.prompt_encoder(
             points=None,
             boxes=box,
             masks=None,
         )
-        
+
         # adapter image encoder
         input_image = self.sam.preprocess(img) # (B, 3, 1024, 1024)
         image_embedding, expert_activation = self.sam.image_encoder(input_image, modal_embed, organ_embed) # (B, 256, 64, 64)
-        
+
         # predicted masks
         mask_predictions, _ = self.sam.mask_decoder(
             image_embeddings=image_embedding, # (B, 256, 64, 64)
@@ -281,5 +281,5 @@ class MedSegX(nn.Module):
             dense_prompt_embeddings=dense_embeddings, # (B, 256, 64, 64)
             multimask_output=True,
           )
-        
+
         return mask_predictions

@@ -49,7 +49,7 @@ parser.add_argument("--checkpoint", type=str, default="./playground/SAM",
                     help="path to SAM checkpoint folder")
 parser.add_argument("--model_type", type=str, default="vit_b",
                     help="SAM model scale (e.g vit_b, vit_l, vit_h)")
-parser.add_argument("--task_name", type=str, default="MedSegX_test")
+parser.add_argument("--task_name", type=str, default="MedSegX")
 parser.add_argument("--method", type=str, default="medsegx")
 parser.add_argument("--bottleneck_dim", type=int, default=16)
 parser.add_argument("--embedding_dim", type=int, default=16)
@@ -79,7 +79,7 @@ parser.add_argument("--use_amp", action="store_true", default=False,
 
 def main(args):
     device = torch.device(args.device)
-    
+
     checkpoint = join(args.checkpoint, sam_model_checkpoint[args.model_type])
     sam_model = sam_model_registry[args.model_type](image_size=256, keep_resolution=True, checkpoint=checkpoint)
     if args.method == "medsam":
@@ -89,10 +89,10 @@ def main(args):
     else:
         raise NotImplementedError("Method {} not implemented!".format(args.method))
     dsc_metric = SegmentMetrics(["dsc"]).to(device)
-    
+
     model = nn.DataParallel(model, device_ids=args.device_ids)
     dsc_metric = nn.DataParallel(dsc_metric, device_ids=args.device_ids)
-    
+
     work_dir = join(args.work_dir, args.task_name)
     os.makedirs(work_dir, exist_ok=True)
     log_writer = SummaryWriter(log_dir=work_dir)
@@ -116,7 +116,7 @@ def main(args):
     criterion = DiceBCELoss(sigmoid=True, squared_pred=True, reduction='none')
     logger.info("Criterion: %s" % str(criterion))
 
-    train_dataset = GeneralMedSegDB(join(args.data_path, "pretrain"), train=True)
+    train_dataset = GeneralMedSegDB(join(args.data_path, "train"), train=True)
     logger.info(f"Number of training samples: {len(train_dataset)}")
     train_dataloader = DataLoader(
         train_dataset,
@@ -126,8 +126,8 @@ def main(args):
         pin_memory=True,
         drop_last=True,
     )
-    
-    val_dataset = GeneralMedSegDB(join(args.data_path, "internal"), train=False)
+
+    val_dataset = GeneralMedSegDB(join(args.data_path, "eval/ID"), train=False)
     logger.info(f"Number of validation samples: {len(val_dataset)}")
     val_dataloader = DataLoader(
         val_dataset,
@@ -137,7 +137,7 @@ def main(args):
         pin_memory=True,
         drop_last=False,
     )
-    
+
     img_size = model.module.sam.image_encoder.img_size
     img_transform = Resize((img_size, img_size), antialias=True)
     box_transform = ResizeLongestSide(img_size)
@@ -150,7 +150,7 @@ def main(args):
     loss_log = []
     lr_log = []
     dsc_log = []
-    
+
     if args.resume is not None:
         if os.path.isfile(args.resume):
             ## Map model to be loaded to specified single GPU
@@ -161,7 +161,7 @@ def main(args):
             optimizer.load_state_dict(checkpoint["optimizer"])
     if args.use_amp:
         scaler = torch.cuda.amp.GradScaler()
-    
+
     start_time = time.time()
     for epoch in range(start_epoch, num_epochs):
         # train
@@ -173,7 +173,7 @@ def main(args):
         for data, label in pbar_train:
             optimizer.zero_grad()
             step += 1
-            
+
             if data["img"].shape[-1] != img_size:
                 data["box"] = box_transform.apply_boxes_torch((data["box"].reshape(-1, 2, 2)), 
                                                                 data["img"].shape[-2:]).reshape(-1, 4)
@@ -181,7 +181,7 @@ def main(args):
             data["img"] = data["img"].to(device, non_blocking=True)
             data["box"] = data["box"].to(device, non_blocking=True)
             label = label.to(device, non_blocking=True)
-            
+
             if args.use_amp:
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
                     mask_pred = model(data)
@@ -189,7 +189,7 @@ def main(args):
                 mask_pred = model(data)
             if mask_pred.shape[-1] != label.shape[-1]:
                 mask_pred = F.interpolate(mask_pred, size=label.shape[-1], mode="bilinear", antialias=True)
-            
+
             losses = []
             for i in range(model.module.sam.mask_decoder.num_multimask_outputs):
                 output = mask_pred[:, i].unsqueeze(1)
@@ -208,14 +208,14 @@ def main(args):
             epoch_loss += loss.item()
             lr = optimizer.state_dict()['param_groups'][0]['lr']
             pbar_train.set_postfix({"lr": lr, "loss": loss.item()})
-            
+
             """ We use epoch_1000x as the x-axis in tensorboard.
             This calibrates different curves when batch size changes.
             """
             epoch_1000x = int((epoch + step / len(train_dataloader)) * 1000)
             log_writer.add_scalar('batch/lr', lr, epoch_1000x)
             log_writer.add_scalar('batch/loss', loss.item(), epoch_1000x)
-        
+
         lr_log.append(lr)
         epoch_loss /= step
         loss_log.append(epoch_loss)
@@ -224,7 +224,7 @@ def main(args):
         print(
             f'Time: {datetime.now().strftime("%Y/%m/%d-%H:%M")}, Epoch: {epoch}, Loss: {epoch_loss}'
         )
-        
+
         ## save the latest model
         checkpoint = {
             "model": model.module.save_parameters(),
@@ -242,7 +242,7 @@ def main(args):
                 "epoch": epoch,
             }
             torch.save(checkpoint, join(work_dir, "model_lowest.pth"))
-        
+
         ## save the model
         if True:
             checkpoint = {
@@ -251,8 +251,8 @@ def main(args):
                 "epoch": epoch,
             }
             torch.save(checkpoint, join(work_dir, f"model_{epoch}.pth"))
-        
-        # validation
+
+        # eval
         epoch_dsc = 0
         size = 0
         model.eval()
@@ -267,29 +267,29 @@ def main(args):
                 data["img"] = data["img"].to(device, non_blocking=True)
                 data["box"] = data["box"].to(device, non_blocking=True)
                 label = label.to(device, non_blocking=True)
-                
+
                 mask_pred = model(data)
                 if mask_pred.shape[-1] != label.shape[-1]:
                     mask_pred = F.interpolate(mask_pred, size=label.shape[-1], mode="bilinear", antialias=True)
                 mask_prob = torch.sigmoid(mask_pred)
                 mask = (mask_prob > 0.5).bool()
-                
+
                 dsc_ambiguous = []
                 for idx in range(model.module.sam.mask_decoder.num_multimask_outputs):
                     dsc_ambiguous.append(dsc_metric(mask[:, idx].unsqueeze(1), label)["dsc"])
                 dsc = torch.stack(dsc_ambiguous, dim=0).max(dim=0)[0]
-                
+
                 epoch_dsc += dsc.sum().item()
                 size += dsc.shape[0]
                 pbar_val.set_postfix({"dsc": dsc.mean().item()})
-        
+
         epoch_dsc /= size
         dsc_log.append(epoch_dsc)
         log_writer.add_scalar('epoch/dsc', epoch_dsc, epoch + 1)
         print(
             f'Time: {datetime.now().strftime("%Y/%m/%d-%H:%M")}, Epoch: {epoch}, DSC: {epoch_dsc}'
         )
-        
+
         ## save the best model
         if epoch_dsc > best_dsc:
             best_dsc = epoch_dsc
@@ -300,7 +300,7 @@ def main(args):
                 "epoch": epoch,
             }
             torch.save(checkpoint, join(work_dir, "model_best.pth"))
-        
+
         # plot loss
         plt.plot(loss_log)
         plt.title("Training Loss")
@@ -308,7 +308,7 @@ def main(args):
         plt.ylabel("Loss")
         plt.savefig(join(work_dir, "train_loss.png"))
         plt.close()
-        
+
         # plot lr
         plt.plot(lr_log)
         plt.title("Learning Rate")
@@ -316,7 +316,7 @@ def main(args):
         plt.ylabel("LR")
         plt.savefig(join(work_dir, "lr.png"))
         plt.close()
-        
+
         # plot dsc
         plt.plot(dsc_log)
         plt.title("Validation DSC")
@@ -324,10 +324,10 @@ def main(args):
         plt.ylabel("DSC")
         plt.savefig(join(work_dir, "val_dsc.png"))
         plt.close()
-        
+
         logger.info(f"Epoch [{epoch}] - LR: {lr}, Loss: {epoch_loss}, DSC: {epoch_dsc}")
         log_writer.flush()
-    
+
     total_time = time.time() - start_time
     total_time_str = str(timedelta(seconds=int(total_time)))
     logger.info(f"Best epoch: {best_epoch}, Best DSC: {best_dsc}")

@@ -37,7 +37,7 @@ parser.add_argument("--bottleneck_dim", type=int, default=16)
 parser.add_argument("--embedding_dim", type=int, default=16)
 parser.add_argument("--expert_num", type=int, default=4)
 # data
-parser.add_argument("--data_path", type=str, default="./playground/MedSegDB/example",
+parser.add_argument("--data_path", type=str, default="./playground/MedSegDB/eval/ID",
                     help="path to MedSegDB data folder")
 parser.add_argument("--metric", type=str, default=["dsc", "hd"], nargs='+',
                     help="evaluation metrics (e.g dsc, hd)")
@@ -53,11 +53,11 @@ def evaluate(model, metric, dataloader, img_size, img_transform, box_transform,
              dataset, task, sequence=None, result_total=None, meta=None, args=None):
     model.eval()
     device = torch.device(args.device)
-    
+
     result_task = {}
     for m in args.metric:
         result_task[m] = []
-    
+
     pbar = tqdm(dataloader)
     if sequence is not None:
         pbar.set_description(f"Evaluating - {dataset} {task} {sequence}")
@@ -72,26 +72,26 @@ def evaluate(model, metric, dataloader, img_size, img_transform, box_transform,
             data["img"] = data["img"].to(device, non_blocking=True)
             data["box"] = data["box"].to(device, non_blocking=True)
             label = label.to(device, non_blocking=True, dtype=torch.bool)
-            
+
             mask_pred = model(data)
-            
+
             if mask_pred.shape[-1] != label.shape[-1]:
                 mask_pred = F.interpolate(mask_pred, size=label.shape[-1], mode="bilinear", antialias=True)
             mask_prob = torch.sigmoid(mask_pred)
             mask = (mask_prob > 0.5).bool()
-            
+
             result_list = {}
             metric_dict = {}
             metric_list = {m: [] for m in args.metric}
             for m in args.metric:
                 result_list[m] = []
-            
+
             # handle ambiguous segmentation
             for idx in range(model.module.sam.mask_decoder.num_multimask_outputs):
                 result_batch = metric(mask[:, idx].unsqueeze(1), label)
                 for m in args.metric:
                     result_list[m].append(result_batch[m])
-            
+
             dsc, max_idx = torch.stack(result_list["dsc"], dim=0).max(dim=0)
             for m in args.metric:
                 if m == "dsc":
@@ -104,22 +104,22 @@ def evaluate(model, metric, dataloader, img_size, img_transform, box_transform,
                 metric_list[m].append(result)
                 result_task[m].append(result)
                 result_total[m].append(result)
-            
+
             pbar.set_postfix(metric_dict)
             metric_list = {m: torch.cat(v) for m, v in metric_list.items()}
             for idx, name in enumerate(data["name"]):
-                file = name.replace(f"{args.data_path}/internal/", "").replace("npy_gts/", "")
+                file = name.replace(f"{args.data_path}/", "").replace("npy_gts/", "")
                 meta["File"].append(file)
                 for m in args.metric:
                     meta[m.upper()].append(metric_list[m][idx].item())
-    
+
     result_task = {k: torch.cat(v).mean().item() for k, v in result_task.items()}
     return result_task
 
 
 def main(args):
     device = torch.device(args.device)
-    
+
     checkpoint = join(args.checkpoint, sam_model_checkpoint[args.model_type])
     sam_model = sam_model_registry[args.model_type](image_size=256, keep_resolution=True, checkpoint=checkpoint)
     if args.method == "medsam":
@@ -129,7 +129,7 @@ def main(args):
     else:
         raise NotImplementedError("Method {} not implemented!".format(args.method))
     seg_metric = SegmentMetrics(args.metric).to(device)
-    
+
     model = nn.DataParallel(model, device_ids=args.device_ids)
     seg_metric = nn.DataParallel(seg_metric, device_ids=args.device_ids)
 
@@ -141,9 +141,9 @@ def main(args):
     else:
         raise FileNotFoundError(f"model weight {args.model_weight} not found!")
     work_dir = os.path.dirname(args.model_weight)
-    work_dir = join(work_dir, "example", "internal")
+    work_dir = join(work_dir, "internal")
     os.makedirs(work_dir, exist_ok=True)
-    
+
     img_size = model.module.sam.image_encoder.img_size
     img_transform = Resize((img_size, img_size), antialias=True)
     box_transform = ResizeLongestSide(img_size)
@@ -154,11 +154,11 @@ def main(args):
         result_total[m] = []
         meta[m.upper()] = []
     time_start = time.time()
-    
-    print(f"save evaluation result to {join(work_dir, 'internal.md')}")
-    with open(join(work_dir, 'internal.md'), mode="w") as f:
+
+    print(f"save evaluation result to {join(work_dir, 'ID.md')}")
+    with open(join(work_dir, 'ID.md'), mode="w") as f:
         f.write("# internal evaluation\n\n")
-        data_path = join(args.data_path, "internal")
+        data_path = args.data_path
         # iterate over datasets
         for dataset in sorted(os.listdir(data_path)):
             f.write(f"- {dataset}\n")
@@ -178,7 +178,7 @@ def main(args):
                     )
                     if len(test_dataset) == 0:
                         continue
-                    
+
                     # evaluate
                     metric_task = evaluate(model, seg_metric, test_dataloader, 
                                            img_size, img_transform, box_transform, 
@@ -186,13 +186,13 @@ def main(args):
                                            meta=meta, args=args)
                     result_task = ", ".join([f"{k.upper()} ({v:.4f})" for k, v in metric_task.items()])
                     f.write(f"  - {task}: {result_task}\n")
-                
+
                 # have different sequences
                 else:
                     f.write(f"  - {task}\n")
                     for sequence in sorted(os.listdir(task_path)):
                         sequence_path = join(task_path, sequence)
-                        test_dataset = TaskMedSegDB(sequence_path, train=False)
+                        test_dataset = TaskMedSegDB(sequence_path, train=False, sequence=True)
                         test_dataloader = DataLoader(
                             test_dataset,
                             batch_size=args.batch_size,
@@ -202,7 +202,7 @@ def main(args):
                         )
                         if len(test_dataset) == 0:
                             continue
-                        
+
                         # evaluate
                         metric_task = evaluate(model, seg_metric, test_dataloader, 
                                                img_size, img_transform, box_transform, 
@@ -210,18 +210,18 @@ def main(args):
                                                meta=meta, args=args)
                         result_task = ", ".join([f"{k.upper()} ({v:.4f})" for k, v in metric_task.items()])
                         f.write(f"    - {sequence}: {result_task}\n")
-        
+
         result_total = {k: torch.cat(v).mean().item() for k, v in result_total.items()}
         result_total = ", ".join([f"{k.upper()} ({v:.4f})" for k, v in result_total.items()])
         f.write(f"- ALL\n")
         f.write(f"  - Mean: {result_total}\n")
-    
+
     time_end = time.time()
     print(f"Time cost: {time_end - time_start:.0f} s")
-    
+
     # record instance-level results
     df = pd.DataFrame(meta)
-    df.to_csv(f"{work_dir}/internal.csv", index=False)
+    df.to_csv(f"{work_dir}/ID.csv", index=False)
 
 
 if __name__ == "__main__":

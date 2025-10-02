@@ -2,11 +2,11 @@
 
 ### A generalist foundation model and database for open-world medical image segmentation
 
-Siqi Zhang*, Qizhe Zhang*, Shanghang Zhang*†, Xiaohong Liu*, Jingkun Yue*, Ming Lu, Huihuan Xu, Jiaxin Yao, Xiaobao Wei, Jiajun Cao, Xiang Zhang, Ming Gao, Jun Shen, Yichang Hao, Yinkui Wang, Xingcai Zhang, Song Wu, Ping Zhang, Shuguang Cui & Guangyu Wang†
+Siqi Zhang*, Qizhe Zhang*, Shanghang Zhang*†, Xiaohong Liu*, Jingkun Yue*, Ming Lu, Huihuan Xu, Jiaxin Yao, Xiaobao Wei, Jiajun Cao, Xiang Zhang, Ming Gao, Jun Shen, Yichang Hao, Yinkui Wang, Xingcai Zhang, Song Wu, Ping Zhang, Shuguang Cui & Guangyu Wang† (*Equal Contribution, †Corresponding Author)
 
 [Nature Biomedical Engineering (2025)](https://www.nature.com/articles/s41551-025-01497-3): https://www.nature.com/articles/s41551-025-01497-3
 
-*Corresponding Authors: Guangyu Wang, Shanghang Zhang.*
+*Lead Contact: Prof. Guangyu Wang, Prof. Shanghang Zhang.*
 
 #### Abstract
 
@@ -69,223 +69,161 @@ playground/
 
 ### 📊 Data
 
-We provide an example dataset to enable users to easily and quickly perform inference with our MedSegX. You can download the example data from [Google Drive](https://drive.google.com/file/d/1MqI5m-lrRMqQghhbiXAdcgHFRLEuNtPN/view?usp=share_link).
+We provide an [example dataset](playground/example_data.zip) to help users get started with MedSegX quickly. This example dataset has already been organized according to the complete MedSegDB structure. You only need to unzip it to the `./playground/MedSegDB-example` directory. Then, you can directly go to the [Quick Start](#-quick-start) section to perform a fast inference.
 
-The pre-training, ID and OOD datasets from our MedSegDB database are curated from open-source datasets and can be accessed via the weblinks provided in Supplementary Table 1 (see Supplementary Information). Among these, the data in MedSegDB that permit redistribution are available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB), in which the data is fully preprocessed and can be used out of the box. No further preprocessing is needed before model training or inference.
+Our MedSegDB are curated from open-source medical segmentation datasets, which can be accessed via the weblinks provided in [Supplementary Table 1](https://static-content.springer.com/esm/art%3A10.1038%2Fs41551-025-01497-3/MediaObjects/41551_2025_1497_MOESM1_ESM.pdf). Among them, the datasets that permit redistribution are available on [HuggingFace](https://huggingface.co/datasets/medicalai/MedSegDB), where the data is fully preprocessed and can be used out of the box without any further processing.
 
-The datasets should also be placed in the `./playground` directory. 
-
-When using the data for pre-training and ID evaluation, please organize them in the following structure:
+The whole MedSegDB should also be placed in the `./playground` directory and organized in the following structure:
 ```
 playground/
 └── MedSegDB/
-    └── ID/
-        ├── dataset1/
-        │   ├── modality_task1/
-        │   │   ├── npy_imgs/                   # preprocessed images in .npy format
-        │   │   └── npy_gts/                    # corresponding ground truth labels
-        │   ├── modality_task2/
-        │   │   ├── npy_imgs/
-        │   │   └── npy_gts/
-        │   └── ...                             # other modality-task pairs
-        ├── dataset2/
-        │   ├── modality_task1/
-        │   │   ├── sequence1/                  # if multiple sequences exist
-        │   │   │   ├── npy_imgs/
-        │   │   │   └── npy_gts/
-        │   │   ├── sequence2/
-        │   │   │   ├── npy_imgs/
-        │   │   │   └── npy_gts/
-        │   │   └── ...                         # other sequences if available
-        │   └── ...                             # other modality-task pairs
-        └── ...                                 # other datasets
+    ├── train/
+    └── eval/
+        ├── ID/
+        ├── OOD/
+        │   ├── cross_site/
+        │   └── cross_task/
+        └── RealWorld/
+            ├── cross_site/
+            └── cross_task/
 ```
 
-For example,
-```
-playground/
-└── MedSegDB/
-    └── ID/
-        ├── ACDC/
-        │   ├── MRI_LeftVentricle/
-        │   │   ├── npy_imgs/
-        │   │   └── npy_gts/
-        │   ├── MRI_MitralValve/
-        │   │   ├── npy_imgs/
-        │   │   └── npy_gts/
-        │   └── ...                             # other modality-task pairs
-        ├── BraTS2020/
-        │   ├── MRI_BrainCoreTumor/
-        │   │   ├── FLAIR/
-        │   │   │   ├── npy_imgs/
-        │   │   │   └── npy_gts/
-        │   │   ├── T1/
-        │   │   │   ├── npy_imgs/
-        │   │   │   └── npy_gts/
-        │   │   └── ...                         # other sequences
-        │   └── ...                             # other modality-task pairs
-        └── ...                                 # other datasets
-```
-
-When using the data for OOD (or real-world) evaluation, please organize them in the following structure:
-```
-playground/
-└── MedSegDB/
-    └── OOD/
-        ├── cross_site/                         # cross-site shift
-        │   ├── modality_task1/
-        │   │   ├── dataset1/
-        │   │   │   ├── finetune/               # fine-tune data
-        │   │   │   │   ├── 005_percent/        # different fine-tune percents
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   ├── 015_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   ├── 025_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   ├── 050_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   └── 100_percent/
-        │   │   │   │       ├── npy_imgs/
-        │   │   │   │       └── npy_gts/
-        │   │   │   └── inference/              # inference data
-        │   │   │       ├── npy_imgs/
-        │   │   │       └── npy_gts/
-        │   │   ├── dataset2/
-        │   │   └── ...                         # other datasets
-        │   ├── modality_task2/
-        │   │   ├── dataset1/
-        │   │   │   ├── sequence1/              # if multiple sequences exist
-        │   │   │   │   ├── finetune/
-        │   │   │   │   │   ├── 005_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   ├── 015_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   ├── 025_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   ├── 050_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   └── 100_percent/
-        │   │   │   │   │       ├── npy_imgs/
-        │   │   │   │   │       └── npy_gts/
-        │   │   │   │   └── inference/
-        │   │   │   │       ├── npy_imgs/
-        │   │   │   │       └── npy_gts/
-        │   │   │   ├── sequence2/
-        │   │   │   └── ...                     # other sequences if available
-        │   │   ├── dataset2/
-        │   │   └── ...                         # other datasets
-        │   └── ...                             # other modality-task pairs
-        └── cross_task/                         # cross-task shift
-```
-
-For example,
-```
-playground/
-└── MedSegDB/
-    └── OOD/
-        ├── cross_site/
-        │   ├── CT_Liver/
-        │   │   ├── SLIVER07/
-        │   │   │   ├── finetune/
-        │   │   │   │   ├── 005_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   ├── 015_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   ├── 025_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   ├── 050_percent/
-        │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   └── npy_gts/
-        │   │   │   │   └── 100_percent/
-        │   │   │   │       ├── npy_imgs/
-        │   │   │   │       └── npy_gts/
-        │   │   │   └── inference/
-        │   │   │       ├── npy_imgs/
-        │   │   │       └── npy_gts/
-        │   │   └── ...                         # other datasets
-        │   ├── MRI_Spleen/
-        │   │   ├── CHAOS/
-        │   │   │   ├── T2W/
-        │   │   │   │   ├── finetune/
-        │   │   │   │   │   ├── 005_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   ├── 015_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   ├── 025_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   ├── 050_percent/
-        │   │   │   │   │   │   ├── npy_imgs/
-        │   │   │   │   │   │   └── npy_gts/
-        │   │   │   │   │   └── 100_percent/
-        │   │   │   │   │       ├── npy_imgs/
-        │   │   │   │   │       └── npy_gts/
-        │   │   │   │   └── inference/
-        │   │   │   │       ├── npy_imgs/
-        │   │   │   │       └── npy_gts/
-        │   │   │   └── ...                     # other sequences
-        │   │   └── ...                         # other datasets
-        │   └── ...                             # other modality-task pairs
-        └── cross_task/
-```
+For more details about data structure of MedSegDB, please see [DATA.md](docs/DATA.md).
 
 ## 🛠️ Usage
 
-### 🚀 Training
+### 🚀 Quick Start
 
-After preparing the whole MedSegDB, you can train MedSegX using the following command:
+After preparing the model weights and the example dataset, you can easily use the [`quick-start.sh`](scripts/quick-start.sh) script to perform inference with MedSegX. For example, if you want to conduct an ID evaluation, you can run the following command:
 ```bash
-python pretrain.py
+python evaluate_internal.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --model_weight ./playground/MedSegX/medsegx_vit_b.pth \
+    --data_path ./playground/MedSegDB-example/eval/ID \
+    --metric dsc hd \
+    --device_ids 0 \
+    --batch_size 32
 ```
 
-This command trains MedSegX on 8 GPUs by default, with the batch size of 1024, requiring at least 40GB memory for each GPU. You can set the `device_ids` and `batch_size` arguments for different machine. For example, if you want to train MedSegX on a single GPU, you can use the following command:
+After running the above script, the results will be saved in the `./playground/MedSegX` directory. We also provide [example results](playground/MedSegX/example_results.zip) for double-checking.
+
+### 🏗️ Training
+
+After preparing the whole MedSegDB according to [DATA.md](docs/DATA.md), you can use the following command to train MedSegX:
 ```bash
-python pretrain.py --device_ids 0 --batch_size 128 --lr 1e-4
+python pretrain.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --data_path ./playground/MedSegDB \
+    --device_ids 0 1 2 3 4 5 6 7 \
+    --num_epochs 30 \
+    --batch_size 1024 \
+    --lr 1e-3 \
+    --use_amp
 ```
 
-After pre-training, you can further fine-tune MedSegX on the downstream tasks by using the following command:
+This command trains MedSegX on 8 GPUs by default, with the batch size of 1024, requiring at least 40GB memory for each GPU. You can set the `device_ids` and `batch_size` arguments for different machine. For example, if you want to train MedSegX on 4 GPUs, you can use the following command:
 ```bash
-python finetune.py
+python pretrain.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --data_path ./playground/MedSegDB \
+    --device_ids 0 1 2 3 \
+    --num_epochs 30 \
+    --batch_size 512 \
+    --lr 5e-4 \
+    --use_amp
 ```
 
-Similarly, 8 GPUs are used for training by default. You can adjust the same arguments for different machines.
+### 🎛️ Tuning
+
+You can further fine-tune our provided MedSegX pre-trained weight on OOD tasks to achieve better performance. For example, if you want to fine-tune on cross-site shift, you can use the following command:
+```bash
+python finetune.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --data_path ./playground/MedSegDB/eval/OOD \
+    --shift_type cross_site \
+    --device_ids 0 1 2 3 4 5 6 7 \
+    --num_epochs 30 \
+    --batch_size 64 \
+    --validation val \
+    --resume ./playground/MedSegX/medsegx_vit_b.pth \
+    --lr 5e-5 \
+    --use_amp
+```
+
+Similarly, if you want to perform fine-tuning on cross-task shift using a single GPU, you can use the following command:
+```bash
+python finetune.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --data_path ./playground/MedSegDB/eval/OOD \
+    --shift_type cross_task \
+    --device_ids 0 \
+    --num_epochs 30 \
+    --batch_size 64 \
+    --validation val \
+    --resume ./playground/MedSegX/medsegx_vit_b.pth \
+    --lr 5e-5 \
+    --use_amp
+```
 
 ### 🧪 Evaluation
 
 For internal evalution, you can run the following command:
 ```bash
-python evaluate_internal.py
+python evaluate_internal.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --model_weight ./playground/MedSegX/medsegx_vit_b.pth \
+    --data_path ./playground/MedSegDB/eval/ID \
+    --metric dsc hd \
+    --device_ids 0 1 2 3 4 5 6 7 \
+    --batch_size 32
 ```
 
-For external evalution with cross site shift, you can run the following command:
+For external evalution with cross-site shift, you can run the following command:
 ```bash
-python evaluate_external.py --shift_type cross_site
+python evaluate_external.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --model_weight ./playground/MedSegX/medsegx_vit_b.pth \
+    --data_path ./playground/MedSegDB/eval/OOD \
+    --shift_type cross_site \
+    --metric dsc hd \
+    --device_ids 0 1 2 3 4 5 6 7 \
+    --batch_size 32
 ```
 
-For external evalution with cross task shift, you can run the following command:
+And for external evalution with cross-task shift, you can run the following command:
 ```bash
-python evaluate_external.py --shift_type cross_task
+python evaluate_external.py \
+    --checkpoint ./playground/SAM \
+    --model_type vit_b \
+    --model_weight ./playground/MedSegX/medsegx_vit_b.pth \
+    --data_path ./playground/MedSegDB/eval/OOD \
+    --shift_type cross_task \
+    --metric dsc hd \
+    --device_ids 0 1 2 3 4 5 6 7 \
+    --batch_size 32
 ```
-
-After running the evaluation commands, the results will be saved in the `./playground/MedSegX/example` folder.
-
-You can download our evalution results from [Google Drive](https://drive.google.com/file/d/1I1kmHtRGAs2wUiuvFgPDte9Mo_y3X1EC/view?usp=share_link) for double checking.
 
 ## 🔖 Citation
-If you find MedSegX useful for your research and applications, please cite this work:
+If you find MedSegX useful for your research and applications, please cite using this BibTeX:
+```
+@article{zhang2025generalist,
+  title={A generalist foundation model and database for open-world medical image segmentation},
+  author={Zhang, Siqi and Zhang, Qizhe and Zhang, Shanghang and Liu, Xiaohong and Yue, Jingkun and Lu, Ming and Xu, Huihuan and Yao, Jiaxin and Wei, Xiaobao and Cao, Jiajun and others},
+  journal={Nature Biomedical Engineering},
+  pages={1--16},
+  year={2025},
+  publisher={Nature Publishing Group UK London}
+}
+```
+
+Or the following plain-text version from [Nature](https://www.nature.com/articles/s41551-025-01497-3#citeas):
 ```
 Zhang, S., Zhang, Q., Zhang, S. et al. A generalist foundation model and database for open-world medical image segmentation. Nat. Biomed. Eng (2025). https://doi.org/10.1038/s41551-025-01497-3
 ```

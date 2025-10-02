@@ -1,3 +1,4 @@
+# modality
 modal_dict = {
     "CBCT": "CBCT", 
     "Colon": "Colonos",
@@ -32,26 +33,27 @@ modal_map = {
 modal_map_inv = {v: k for k, v in modal_map.items()}
 modal_map_idx = {k: i for i, k in enumerate(modal_map_inv.keys())}
 
+
+# body parts
 organ_level_1_dict = {
     "head&neck": ["LeftCaudatum", "RightCaudatum", "VestibularSchwannoma", "BrainWholeTumor", "BrainCoreTumor", 
-                  "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", "WhiteMatterHyperintensity", 
-                  "WhiteMatter", "GrayMatter", "CerebroSpinalFluid", "Hippocampus", "Pituitary", 
-                  "OpticCup", "OpticDisc", "RightInnerEar", "LeftMiddleEar", "GTVnx", 
+                  "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", 
+                  "WhiteMatterHyperintensity", "WhiteMatter", "GrayMatter", "CerebroSpinalFluid", "Hippocampus", 
+                  "Pituitary", "OpticCup", "OpticDisc", "RightInnerEar", "LeftMiddleEar", "GTVnx", 
                   "Tooth", "Lip", "CavityOral", "BuccalMucosa", "Glottis", "PharynxCancer", 
                   "GTVnd", "GlndThyroid", "ThyroidNodule", "ParotidL", "GindSubmandL"],
     "body": ["LeftLung", "RightLung", "LungCancer", "COVID", "GroundGlassesOpacities", 
              "Consolidation", "PleuraEffusion", "LungPneumothorax", "Bronchus", "PulmonaryAirways", 
              "Esophagus", "Heart", "LeftAtrium", "LVMyocardialEdema", "LVMyocardialScars", 
-             "LeftAtrialBloodChamber", "RightAtrialBloodChamber", "LeftVentricle", "RightVentricle", "LeftVentricularBloodChamber", 
-             "RightVentricularBloodChamber", "LeftVentricularMyocardium", "RightVentricularMyocardium", "NoReflow", 
-             "MyocardialInfarction", "MitralValve", "LeftVentricleEpicardium", "BreastCancer", "Liver", 
-             "LiverCancer", "GallBladder", "Pancreas", "PancreasCancer", "Spleen", 
+             "LeftAtrialBloodChamber", "RightAtrialBloodChamber", "LeftVentricle", "RightVentricle", 
+             "LeftVentricularBloodChamber", "RightVentricularBloodChamber", "LeftVentricularMyocardium", 
+             "RightVentricularMyocardium", "NoReflow", "MyocardialInfarction", "MitralValve", "LeftVentricleEpicardium", 
+             "BreastCancer", "Liver", "LiverCancer", "GallBladder", "Pancreas", "PancreasCancer", "Spleen", 
              "LeftKidney", "RightKidney", "KidneyTumor", "LeftAdrenalGland", "RightAdrenalGland", 
-             "Stomach", "StomachCancer", "Duodenum", "Colon", "ColonCancer", 
-             "Rectum", "Intestine", "Polyp", "Instrument", "Bladder", 
-             "Uterus", "Prostate", "ProstateCentralGland", "ProstatePeripheralZone", "ProstateTransitionalZone", 
-             "ProstateTumor", "InterstitialThickening", "PulmonaryLibrosis", "FNH", "HCC", 
-             "Hemangioma", "ICC"],
+             "Stomach", "StomachCancer", "Duodenum", "Colon", "ColonCancer", "Rectum", "Intestine", 
+             "Polyp", "Instrument", "Bladder", "Uterus", "Prostate", "ProstateCentralGland", 
+             "ProstatePeripheralZone", "ProstateTransitionalZone", "ProstateTumor", "InterstitialThickening", 
+             "PulmonaryLibrosis", "FNH", "HCC", "Hemangioma", "ICC"],
     "skeleton": ["Mandible", "CervicalSpine", "LeftCollarBone", "RightCollarBone", "CollarBone", 
              "ThoracicSpine", "LumbarSpine", "Sacrum", "LeftHip", "RightHip", 
              "FemurBone", "FemurCartilage", "TibiaBone", "TibiaCartilage"], 
@@ -70,10 +72,12 @@ organ_level_1_map = {
 organ_level_1_map_inv = {v: k for k, v in organ_level_1_map.items()}
 organ_level_1_map_idx = {k: i for i, k in enumerate(organ_level_1_map_inv.keys())}
 
+
+# body subregions
 organ_level_2_dict = {
     "head": ["LeftCaudatum", "RightCaudatum", "VestibularSchwannoma", "BrainWholeTumor", "BrainCoreTumor", 
-             "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", "WhiteMatterHyperintensity", 
-             "WhiteMatter", "GrayMatter", "CerebroSpinalFluid", "Hippocampus", "Pituitary"], 
+             "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", 
+             "WhiteMatterHyperintensity", "WhiteMatter", "GrayMatter", "CerebroSpinalFluid", "Hippocampus", "Pituitary"], 
     "face": ["OpticCup", "OpticDisc", "RightInnerEar", "LeftMiddleEar", "GTVnx", 
              "Tooth", "Lip", "CavityOral", "BuccalMucosa"], 
     "neck": ["Glottis", "PharynxCancer", "GTVnd", "GlndThyroid", "ThyroidNodule", 
@@ -81,10 +85,10 @@ organ_level_2_dict = {
     "chest": ["LeftLung", "RightLung", "LungCancer", "COVID", "GroundGlassesOpacities", 
               "Consolidation", "PleuraEffusion", "LungPneumothorax", "Bronchus", "PulmonaryAirways", 
               "Esophagus", "Heart", "LeftAtrium", "LVMyocardialEdema", "LVMyocardialScars", 
-              "LeftAtrialBloodChamber", "RightAtrialBloodChamber", "LeftVentricle", "RightVentricle", "LeftVentricularBloodChamber", 
-              "RightVentricularBloodChamber", "LeftVentricularMyocardium", "RightVentricularMyocardium", "NoReflow", 
-              "MyocardialInfarction", "MitralValve", "LeftVentricleEpicardium", "BreastCancer", "InterstitialThickening", 
-              "PulmonaryLibrosis"], 
+              "LeftAtrialBloodChamber", "RightAtrialBloodChamber", "LeftVentricle", "RightVentricle", 
+              "LeftVentricularBloodChamber", "RightVentricularBloodChamber", "LeftVentricularMyocardium", 
+              "RightVentricularMyocardium", "NoReflow", "MyocardialInfarction", "MitralValve", 
+              "LeftVentricleEpicardium", "BreastCancer", "InterstitialThickening", "PulmonaryLibrosis"], 
     "abdomen": ["Liver", "LiverCancer", "GallBladder", "Pancreas", "PancreasCancer", 
                 "Spleen", "LeftKidney", "RightKidney", "KidneyTumor", "LeftAdrenalGland", 
                 "RightAdrenalGland", "Stomach", "StomachCancer", "Duodenum", "Colon", 
@@ -118,10 +122,12 @@ organ_level_2_map = {
 organ_level_2_map_inv = {v: k for k, v in organ_level_2_map.items()}
 organ_level_2_map_idx = {k: i for i, k in enumerate(organ_level_2_map_inv.keys())}
 
+
+# organs and tissues
 organ_level_3_dict = {
     "brain": ["LeftCaudatum", "RightCaudatum", "VestibularSchwannoma", "BrainWholeTumor", "BrainCoreTumor", 
-              "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", "WhiteMatterHyperintensity", 
-              "WhiteMatter", "GrayMatter", "CerebroSpinalFluid"], 
+              "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", 
+              "WhiteMatterHyperintensity", "WhiteMatter", "GrayMatter", "CerebroSpinalFluid"], 
     "hippocampus": ["Hippocampus"], 
     "pituitary": ["Pituitary"],
     "eye": ["OpticCup", "OpticDisc"],
@@ -150,8 +156,7 @@ organ_level_3_dict = {
     "kidney": ["LeftKidney", "RightKidney", "KidneyTumor"], 
     "adrenal": ["LeftAdrenalGland", "RightAdrenalGland"], 
     "stomach": ["Stomach", "StomachCancer"],
-    "intestine": ["Duodenum", "Colon", "ColonCancer", "Rectum", "Intestine", 
-                  "Polyp", "Instrument"], 
+    "intestine": ["Duodenum", "Colon", "ColonCancer", "Rectum", "Intestine", "Polyp", "Instrument"], 
     "bladder": ["Bladder"],
     "uterus": ["Uterus"],
     "prostate": ["Prostate", "ProstateCentralGland", "ProstatePeripheralZone", "ProstateTransitionalZone", "ProstateTumor"], 
@@ -213,11 +218,13 @@ organ_level_3_map = {
 organ_level_3_map_inv = {v: k for k, v in organ_level_3_map.items()}
 organ_level_3_map_idx = {k: i for i, k in enumerate(organ_level_3_map_inv.keys())}
 
+
+# tasks
 task_list = [
     "LeftCaudatum", "RightCaudatum", "VestibularSchwannoma", "BrainWholeTumor", "BrainCoreTumor", 
-    "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", "WhiteMatterHyperintensity", 
-    "WhiteMatter", "GrayMatter", "CerebroSpinalFluid", "Hippocampus", "Pituitary", 
-    "OpticCup", "OpticDisc", "RightInnerEar", "LeftMiddleEar", "GTVnx", 
+    "BrainEnhancingTumor", "IntracranialHemorrhage", "IschemicStrokeLesion", "MultipleSclerosis", 
+    "WhiteMatterHyperintensity", "WhiteMatter", "GrayMatter", "CerebroSpinalFluid", "Hippocampus", 
+    "Pituitary", "OpticCup", "OpticDisc", "RightInnerEar", "LeftMiddleEar", "GTVnx", 
     "Tooth", "Lip", "CavityOral", "BuccalMucosa", "Glottis", 
     "PharynxCancer", "GTVnd", "GlndThyroid", "ThyroidNodule", "ParotidL", 
     "GindSubmandL", "LeftLung", "RightLung", "LungCancer", "COVID", 
@@ -235,16 +242,14 @@ task_list = [
     "CollarBone", "ThoracicSpine", "LumbarSpine", "Sacrum", "LeftHip", 
     "RightHip", "FemurBone", "FemurCartilage", "TibiaBone", "TibiaCartilage", 
     "RetinalVessel", "CarotidArteryRight", "CarotidVesselWall", "PulmonaryArtery", "PulmonaryEmbolism", 
-    "Aorta", "AscendingAorta", "TL", "FL", "FLT", 
-    "Postcava", "Skin"
+    "Aorta", "AscendingAorta", "TL", "FL", "FLT", "Postcava", "Skin"
 ]
 task_idx = {k: i for i, k in enumerate(task_list)}
 
 
 if __name__ == "__main__":
-    print("modal number:", len(modal_map))
-    print("organ level 1 number:", len(organ_level_1_map))
-    print("organ level 2 number:", len(organ_level_2_map))
-    print("organ level 3 number:", len(organ_level_3_map))
+    print("modality number:", len(modal_map))
+    print("body part number:", len(organ_level_1_map))
+    print("body subregion number:", len(organ_level_2_map))
+    print("organ & tissue number:", len(organ_level_3_map))
     print("task number:", len(task_list))
-    

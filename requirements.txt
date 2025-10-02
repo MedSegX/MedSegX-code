@@ -6,4 +6,5 @@ pandas==2.1.4
 Pillow==9.4.0
 scikit-image==0.21.0
 scipy==1.11.2
+tensorboard==2.20.0
 tqdm==4.66.1
